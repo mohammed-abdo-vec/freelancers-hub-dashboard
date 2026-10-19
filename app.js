@@ -34,13 +34,14 @@ function renderSummary() {
   });
   const most = perTask.slice().sort((a, b) => (b.missing + b.needs) - (a.missing + a.needs))[0];
   const four = members.filter((m) => m.done === tasks.length - 1).length;
+  const toFix = members.filter((m) => Object.values(m.tasks).some((t) => ['demo_only', 'broken'].includes(t.status))).length;
   document.getElementById('takeaway').textContent =
     `${stats.all_done} of ${stats.members} members have finished all ${tasks.length} tasks. ` +
     `${most.label} is the task most often missing (${most.missing + most.needs} members).`;
 
   document.getElementById('kpis').replaceChildren(
     ...[[stats.all_done, `Finished all ${tasks.length}`], [four, `One task left`],
-      [stats.none, 'Nothing submitted'], [stats.members, 'Members tracked']]
+      [toFix, 'Has a link to fix'], [stats.members, 'Active members']]
       .map(([n, label]) => el('div', { class: 'kpi' }, el('b', { text: n }), el('span', { text: label }))));
 
   document.getElementById('task-bars').replaceChildren(...perTask.map((t) =>
@@ -60,7 +61,6 @@ function renderSummary() {
     el('option', { value: 'all', text: 'Everyone' }),
     el('option', { value: 'unfinished', text: 'Not finished yet' }),
     el('option', { value: 'needs', text: 'Has a demo or link to fix' }),
-    el('option', { value: 'none', text: 'Nothing submitted' }),
     ...tasks.map((t) => el('option', { value: `missing:${t.key}`, text: `Missing ${t.label}` })));
   filter.value = [...filter.options].some((o) => o.value === current) ? current : 'all';
 
@@ -76,7 +76,6 @@ function matches(m, q, f) {
     ...Object.values(m.tasks).flatMap((t) => [...t.repos.map((r) => r.name), ...t.demos])]
     .some((v) => String(v || '').toLowerCase().includes(q))) return false;
   if (f === 'unfinished') return m.done < data.tasks.length;
-  if (f === 'none') return m.done === 0;
   if (f === 'needs') return Object.values(m.tasks).some((t) => ['demo_only', 'broken'].includes(t.status));
   if (f.startsWith('missing:')) return !COUNTED.has(m.tasks[f.slice(8)].status);
   return true;
