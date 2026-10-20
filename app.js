@@ -197,5 +197,9 @@ document.getElementById('logout').addEventListener('click', () => {
 });
 
 Vault.bindLogin(document.getElementById('login-form'), render);
-const saved = Vault.recall();
-if (saved) render(saved);
+Vault.recall().then((saved) => {
+  if (saved && saved.data) render(saved.data);
+  else if (saved && saved.stale) {
+    document.querySelector('.login-error').textContent = 'The results were updated. Log in again to see the latest.';
+  }
+});

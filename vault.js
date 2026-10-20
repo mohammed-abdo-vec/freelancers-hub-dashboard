@@ -5,6 +5,15 @@ const Vault = (() => {
   const enc = new TextEncoder();
   const bytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   const SESSION = 'fh-session:' + location.pathname;
+  let fileVersion = null;   // the published data.json's version, from the last fetch
+
+  async function fetchFile() {
+    const res = await fetch('data.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('The results file could not be loaded. Check your connection and try again.');
+    const file = await res.json();
+    fileVersion = file.version || null;
+    return file;
+  }
 
   async function accountId(login) {
     const hash = await crypto.subtle.digest('SHA-256', enc.encode('fh:' + login.trim().toLowerCase()));
@@ -12,9 +21,7 @@ const Vault = (() => {
   }
 
   async function open(login, password) {
-    const res = await fetch('data.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('The results file could not be loaded. Check your connection and try again.');
-    const file = await res.json();
+    const file = await fetchFile();
     const rec = file.accounts[await accountId(login)];
     if (!rec) return null;
     const base = await crypto.subtle.importKey('raw', enc.encode(password.trim()), 'PBKDF2', false, ['deriveKey']);
@@ -30,11 +37,23 @@ const Vault = (() => {
   }
 
   function remember(data) {
-    try { sessionStorage.setItem(SESSION, JSON.stringify(data)); } catch {}
+    try { sessionStorage.setItem(SESSION, JSON.stringify({ version: fileVersion, data })); } catch {}
   }
 
-  function recall() {
-    try { return JSON.parse(sessionStorage.getItem(SESSION) || 'null'); } catch { return null; }
+  // The results this tab already unlocked, if they are still the published version.
+  // Resolves to {data} when they are, {stale: true} after an update (log in again), or null.
+  async function recall() {
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(SESSION) || 'null'); } catch {}
+    if (!saved || !saved.data) return null;
+    try {
+      await fetchFile();
+    } catch {
+      return { data: saved.data };   // offline: show what this tab already has
+    }
+    if (saved.version && saved.version === fileVersion) return { data: saved.data };
+    forget();
+    return { stale: true };
   }
 
   function forget() {
