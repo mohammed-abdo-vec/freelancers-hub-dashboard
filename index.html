@@ -49,6 +49,9 @@
   .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
   .tag { display: inline-block; font-size: 11px; font-weight: 500; border-radius: 4px; padding: 0 6px; background: var(--accent-soft); color: var(--accent); }
   .links .tag, .detail-task .tag { justify-self: start; }
+  td.score { white-space: nowrap; }
+  .score-chip { display: inline-block; margin-inline-start: 6px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; }
+  .score-input { max-width: 8rem; }
   .tag-pending { background: var(--warn-soft); color: var(--warn); }
   .detail-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding-top: 8px; }
   .coach-note { display: grid; gap: 2px; border-inline-start: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; padding: 6px 10px; }

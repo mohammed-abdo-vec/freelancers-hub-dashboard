@@ -14,6 +14,9 @@ const open = new Set();
 let pending = { base: null, downloaded: false, members: {} };
 
 const pct = (n, total) => `${total ? (n / total) * 100 : 0}%`;
+const scoreMax = () => data.score_max || 10;
+const totalMax = () => scoreMax() * data.tasks.length;
+const fmtScore = (n) => (n == null ? '' : String(Math.round(n * 10) / 10));
 const visible = () => data.members.filter((m) => !m.hidden);
 const byId = (id) => data.members.find((m) => m.id === id);
 
@@ -40,7 +43,7 @@ function savePending() {
 
 function editColumns() {
   return ['telegram_id', 'member', 'display_name', 'hidden', 'reset_password', 'feedback',
-    ...data.tasks.flatMap((t) => ['status', 'repo', 'demo', 'feedback'].map((f) => `${t.key}_${f}`))];
+    ...data.tasks.flatMap((t) => ['status', 'repo', 'demo', 'feedback', 'score'].map((f) => `${t.key}_${f}`))];
 }
 
 // Saves an edits file for these members (all pending ones by default). The update helper
@@ -67,6 +70,11 @@ function saveFile(name, text) {
 }
 
 // ---------- summary ----------
+
+function avgScore(members) {
+  const scored = members.filter((m) => m.score_total != null);
+  return scored.length ? fmtScore(scored.reduce((sum, m) => sum + m.score_total, 0) / scored.length) : '—';
+}
 
 function barRow(label, segments, total, valueText) {
   return el('div', { class: 'bar-row' },
@@ -100,7 +108,7 @@ function renderSummary() {
 
   document.getElementById('kpis').replaceChildren(
     ...[[stats.all_done, `Finished all ${tasks.length}`], [four, 'One task left'],
-      [toFix, 'Has something to fix'], [stats.members, 'Active members']]
+      [toFix, 'Has something to fix'], [avgScore(members), `Average score (of ${totalMax()})`], [stats.members, 'Active members']]
       .map(([n, label]) => el('div', { class: 'kpi' }, el('b', { text: n }), el('span', { text: label }))));
 
   document.getElementById('task-bars').replaceChildren(...perTask.map((t) =>
@@ -126,7 +134,7 @@ function renderSummary() {
     hiddenCount > 0 && el('option', { value: 'hidden', text: `Hidden (${hiddenCount})` }));
   filter.value = [...filter.options].some((o) => o.value === current) ? current : 'all';
 
-  document.getElementById('head').replaceChildren(...[['name', 'Member'], ['done', 'Done'],
+  document.getElementById('head').replaceChildren(...[['name', 'Member'], ['done', 'Done'], ['score', 'Score'],
     ...tasks.map((t) => [t.key, t.label]), ['tools', 'Tools']].map(([key, label]) =>
     el('th', { class: key === 'tools' ? 'hide-narrow' : null, 'data-key': key },
       el('button', { type: 'button', text: label }))));
@@ -150,6 +158,7 @@ function matches(m, q, f) {
 function sortValue(m, key) {
   if (key === 'name') return m.name.toLowerCase();
   if (key === 'done') return m.done;
+  if (key === 'score') return m.score_total ?? -1;
   if (key === 'tools') return m.tools.filter((t) => !CORE.has(t)).length;
   const order = { done: 0, demo: 1, needs_fix: 2, demo_only: 3, broken: 4, missing: 5 };
   return order[m.tasks[key].status];
@@ -164,7 +173,7 @@ function badges(m) {
 }
 
 function detailRow(m) {
-  const cols = data.tasks.length + 3;
+  const cols = data.tasks.length + 4;
   const link = (url, text) => el('a', { href: url, target: '_blank', rel: 'noopener', text });
   const coachSet = (task) => task.coach && task.coach.length
     ? el('span', { class: 'tag', text: `set by coach: ${task.coach.join(', ')}` }) : null;
@@ -183,7 +192,8 @@ function detailRow(m) {
         const task = m.tasks[t.key];
         const s = STATUS[task.status];
         return el('div', { class: 'detail-task' },
-          el('span', {}, el('span', { class: `pill tone-${s.tone}`, text: s.label }), ' ', el('span', { class: 'small', text: t.label })),
+          el('span', {}, el('span', { class: `pill tone-${s.tone}`, text: s.label }), ' ', el('span', { class: 'small', text: t.label }),
+            task.score != null && el('span', { class: 'score-chip', text: `${fmtScore(task.score)} / ${scoreMax()}` })),
           el('div', { class: 'links' },
             task.repos.map((r) => el('div', {}, link(r.url, r.name), el('span', { class: 'small muted', text: `  ${r.stack.join(', ')}` }))),
             task.demos.map((d) => el('div', {}, link(d, d.replace(/^https?:\/\//, '')))),
@@ -216,9 +226,12 @@ function renderTable() {
         el('span', { class: 'tags' }, badges(m))),
       el('td', {}, el('div', { class: 'done' }, `${m.done}`,
         el('div', { class: 'bar-track' }, el('span', { style: `width:${pct(m.done, total)};background:${m.done === total ? 'var(--ok)' : 'var(--accent)'}` })))),
+      el('td', { class: 'score num' }, m.score_total == null ? el('span', { class: 'muted', text: '—' })
+        : [el('b', { text: fmtScore(m.score_total) }), el('span', { class: 'muted small', text: ` / ${m.scored * scoreMax()}` })]),
       data.tasks.map((t) => {
         const s = STATUS[m.tasks[t.key].status];
-        return el('td', { class: 'task', title: `${t.label}: ${s.label}` },
+        const sc = m.tasks[t.key].score;
+        return el('td', { class: 'task', title: `${t.label}: ${s.label}${sc == null ? '' : ` · ${fmtScore(sc)}/${scoreMax()}`}` },
           el('span', { class: `dot tone-${s.tone}`, role: 'img', 'aria-label': s.label }));
       }),
       el('td', { class: 'hide-narrow small muted', text: m.tools.filter((t) => !CORE.has(t)).join(', ') }));
@@ -277,7 +290,10 @@ function openEditor(id) {
         field('Demo links', el('textarea', { name: `${k}_demo`, rows: String(rowsFor(task.demos.length)), class: 'mono', spellcheck: 'false' },
           val(`${k}_demo`, linesOf(task.demos)).replace(/^none$/, '')),
           e[`${k}_demo`] ? autoBox(`${k}_demo`) : null),
-        field('Feedback on this task', el('textarea', { name: `${k}_feedback`, rows: '2', dir: 'auto' }, val(`${k}_feedback`, task.feedback || ''))));
+        field(`Score (0–${scoreMax()})`, el('input', { type: 'number', name: `${k}_score`, min: '0', max: String(scoreMax()), step: '0.5',
+          inputmode: 'decimal', class: 'score-input', value: val(`${k}_score`, fmtScore(task.score)) }), 'Only coaches see scores.'),
+        field('Feedback on this task', el('textarea', { name: `${k}_feedback`, rows: '2', dir: 'auto' }, val(`${k}_feedback`, task.feedback || '')),
+          'The member sees this in the Feedback section of their page.'));
     }),
     el('div', { class: 'edit-foot' },
       el('span', { class: 'small muted', text: 'Saving downloads an edits file. The update helper on your Mac publishes it.' }),
@@ -311,6 +327,7 @@ function collectChanges(form, m) {
       if (!sameLinks(now, linesOf(current))) ch[name] = now ? now.split(/[\s,]+/).filter(Boolean).join(' ') : 'none';
     }
     setText(`${k}_feedback`, text(`${k}_feedback`), task.feedback || '');
+    setText(`${k}_score`, text(`${k}_score`), fmtScore(task.score));
   }
   return ch;
 }
@@ -335,13 +352,13 @@ dialog.addEventListener('submit', (event) => {
 
 function toCsv() {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const head = ['Member', 'Telegram name', 'Telegram', 'Telegram ID', 'Login', 'Hidden', 'Done', 'Feedback',
-    ...data.tasks.flatMap((t) => [`${t.label}`, `${t.label} repos`, `${t.label} demos`, `${t.label} feedback`]), 'Tools'];
+  const head = ['Member', 'Telegram name', 'Telegram', 'Telegram ID', 'Login', 'Hidden', 'Done', `Total score (of ${totalMax()})`, 'Feedback',
+    ...data.tasks.flatMap((t) => [`${t.label}`, `${t.label} score`, `${t.label} repos`, `${t.label} demos`, `${t.label} feedback`]), 'Tools'];
   const lines = data.members.map((m) => [m.name, m.telegram_name, m.telegram ? `@${m.telegram}` : '', m.id, m.login,
-    m.hidden ? 'yes' : '', m.done, m.feedback,
+    m.hidden ? 'yes' : '', m.done, fmtScore(m.score_total), m.feedback,
     ...data.tasks.flatMap((t) => {
       const x = m.tasks[t.key];
-      return [STATUS[x.status].label, [...x.repos.map((r) => r.url), ...x.broken].join(' '), x.demos.join(' '), x.feedback];
+      return [STATUS[x.status].label, fmtScore(x.score), [...x.repos.map((r) => r.url), ...x.broken].join(' '), x.demos.join(' '), x.feedback];
     }),
     m.tools.join(', ')].map(esc).join(','));
   saveFile(`freelancers-hub-members-${data.scanned_at.slice(0, 10)}.csv`, [head.map(esc).join(','), ...lines].join('\n'));
@@ -365,7 +382,7 @@ document.getElementById('head').addEventListener('click', (event) => {
   if (!th) return;
   const key = th.dataset.key;
   if (key === sortKey) sortDir = sortDir === 'ascending' ? 'descending' : 'ascending';
-  else { sortKey = key; sortDir = key === 'done' || key === 'tools' ? 'descending' : 'ascending'; }
+  else { sortKey = key; sortDir = ['done', 'tools', 'score'].includes(key) ? 'descending' : 'ascending'; }
   renderTable();
 });
 document.getElementById('rows').addEventListener('click', (event) => {
