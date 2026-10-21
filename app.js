@@ -33,9 +33,9 @@ function savePending() {
   try { localStorage.setItem(PENDING_KEY, JSON.stringify(pending)); } catch {}
   const n = Object.keys(pending.members).length;
   document.getElementById('pending').hidden = n === 0;
-  document.getElementById('pending-text').textContent = pending.downloaded
-    ? `${n} edited ${n === 1 ? 'member' : 'members'} downloaded. They go live after the next update. Clear this list once they're published.`
-    : `${n} edited ${n === 1 ? 'member' : 'members'} not saved yet. Download the edits file to apply them on the next update.`;
+  document.getElementById('pending-text').textContent =
+    `Saved edits for ${n} ${n === 1 ? 'member' : 'members'}. With the update helper running on your Mac they go live ` +
+    'in about 2 minutes; refresh and log in again to see them. Without it, run update.py.';
 }
 
 function editColumns() {
@@ -43,13 +43,17 @@ function editColumns() {
     ...data.tasks.flatMap((t) => ['status', 'repo', 'demo', 'feedback'].map((f) => `${t.key}_${f}`))];
 }
 
-function downloadEdits() {
+// Saves an edits file for these members (all pending ones by default). The update helper
+// (watch_edits.py) on the coach's Mac applies it from Downloads as soon as it appears.
+function downloadEdits(ids = Object.keys(pending.members)) {
   const cols = editColumns();
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = Object.entries(pending.members).map(([id, ch]) =>
+  const rows = ids.map((id) => [id, pending.members[id]]).filter(([, ch]) => ch).map(([id, ch]) =>
     cols.map((c) => esc(c === 'telegram_id' ? id : c === 'member' ? byId(Number(id))?.telegram_name : ch[c])).join(','));
-  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-');
-  saveFile(`freelancers-hub-edits-${stamp}.csv`, [cols.join(','), ...rows].join('\n'));
+  if (!rows.length) return;
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
+  const who = ids.length === 1 ? `-${ids[0]}` : '';
+  saveFile(`freelancers-hub-edits-${stamp}${who}.csv`, [cols.join(','), ...rows].join('\n'));
   pending.downloaded = true;
   savePending();
 }
@@ -276,7 +280,7 @@ function openEditor(id) {
         field('Feedback on this task', el('textarea', { name: `${k}_feedback`, rows: '2', dir: 'auto' }, val(`${k}_feedback`, task.feedback || ''))));
     }),
     el('div', { class: 'edit-foot' },
-      el('span', { class: 'small muted', text: 'Changes stay in this browser until you download the edits file.' }),
+      el('span', { class: 'small muted', text: 'Saving downloads an edits file. The update helper on your Mac publishes it.' }),
       el('button', { class: 'btn', type: 'submit', text: 'Save changes' })));
 
   dialog.replaceChildren(form);
@@ -316,10 +320,14 @@ dialog.addEventListener('click', (event) => {
 });
 dialog.addEventListener('submit', (event) => {
   const ch = collectChanges(event.target, editing);
-  if (Object.keys(ch).length) pending.members[editing.id] = ch;
-  else delete pending.members[editing.id];
-  pending.downloaded = false;
-  savePending();
+  const id = String(editing.id);
+  if (Object.keys(ch).length) {
+    pending.members[id] = ch;
+    downloadEdits([id]);         // the edits file goes to Downloads right away
+  } else {
+    delete pending.members[id];
+    savePending();
+  }
   renderTable();
 });
 
