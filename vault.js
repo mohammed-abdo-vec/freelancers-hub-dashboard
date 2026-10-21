@@ -117,6 +117,7 @@ const STATUS = {
   demo: { label: 'Done (demo)', tone: 'ok' },
   demo_only: { label: 'Repo missing', tone: 'warn' },
   broken: { label: 'Repo not found', tone: 'bad' },
+  needs_fix: { label: 'Needs fixing', tone: 'warn' },
   missing: { label: 'Not submitted', tone: 'none' },
 };
 

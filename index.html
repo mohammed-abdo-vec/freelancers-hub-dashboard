@@ -46,6 +46,27 @@
   .detail-task .links { display: grid; gap: 4px; min-width: 0; }
   .detail-task a, .detail-task .url { font-family: var(--mono); font-size: var(--step--1); overflow-wrap: anywhere; }
   .detail-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 500; border-radius: 4px; padding: 0 6px; background: var(--accent-soft); color: var(--accent); }
+  .links .tag, .detail-task .tag { justify-self: start; }
+  .tag-pending { background: var(--warn-soft); color: var(--warn); }
+  .detail-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding-top: 8px; }
+  .coach-note { display: grid; gap: 2px; border-inline-start: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; padding: 6px 10px; }
+  .coach-note .eyebrow { color: var(--accent); }
+  .coach-note p { margin: 0; white-space: pre-line; }
+  .pending { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; background: var(--warn-soft); color: var(--fg); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; }
+  .pending .actions { gap: 8px; }
+  dialog#edit { width: min(46rem, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--fg); }
+  dialog#edit::backdrop { background: rgb(0 0 0 / .45); }
+  .edit-form { display: grid; gap: 16px; padding: 20px; }
+  .edit-head, .edit-foot { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  .edit-foot { position: sticky; bottom: -20px; background: var(--panel); padding: 12px 0 0; border-top: 1px solid var(--line); }
+  .edit-form fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px 14px; margin: 0; display: grid; gap: 10px; min-width: 0; }
+  .edit-form legend { font-weight: 600; padding: 0 6px; display: flex; gap: 8px; align-items: center; }
+  .field-label { font-size: var(--step--1); font-weight: 500; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: var(--step--1); }
+  textarea { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; resize: vertical; }
+  textarea.mono { font-family: var(--mono); font-size: var(--step--1); }
   @media (max-width: 700px) { .hide-narrow { display: none; } .detail-task { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -85,6 +106,14 @@
       </div>
     </header>
 
+    <div class="pending" id="pending" hidden>
+      <span id="pending-text"></span>
+      <div class="actions">
+        <button class="btn" type="button" id="download-edits">Download edits file</button>
+        <button class="btn-quiet" type="button" id="clear-edits">Clear list</button>
+      </div>
+    </div>
+
     <p class="muted" id="takeaway"></p>
     <section class="kpis" id="kpis"></section>
 
@@ -113,7 +142,7 @@
     <section class="panel" id="members">
       <div class="panel-head">
         <h2>Members</h2>
-        <p class="muted small">Click a member to see their repos, demos and login. Click a column to sort.</p>
+        <p class="muted small">Click a member to see everything about them and to edit it. Click a column to sort.</p>
       </div>
       <div class="controls">
         <input type="search" id="search" placeholder="Search names, repos or tools" aria-label="Search members">
@@ -128,9 +157,10 @@
       </div>
     </section>
 
-    <p class="foot">Counted from every link posted in the group’s old and current Telegram chats. A task counts when its GitHub repo was posted and still opens on GitHub; the landing page also counts with a live demo. Tools come from each repo’s package.json and GitHub’s language stats. Logins and passwords stay in credentials.csv on the computer that runs the update.</p>
+    <p class="foot">Counted from every link posted in the group’s old and current Telegram chats. A task counts when its GitHub repo was posted and still opens on GitHub; the landing page also counts with a live demo. Tools come from each repo’s package.json and GitHub’s language stats. Logins and passwords stay in credentials.csv on the computer that runs the update. Edits made here are saved as a file and go live on the next update.</p>
   </section>
 </main>
+<dialog id="edit" aria-label="Edit member"></dialog>
 <script src="vault.js"></script>
 <script src="app.js"></script>
 </body>
